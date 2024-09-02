@@ -1,47 +1,117 @@
-﻿@page "/Login"
+﻿@page "/"
 @using System.Net
+@using System.Security.Claims
 @using System.Text
 @using System.Text.Json
 @using System.Web
 @layout EmptyLayout
 @inject HttpClient Http
-@inject JSRuntime JS
+@inject IJSRuntime JS
 @inject NavigationManager Nav
+@using System.IdentityModel.Tokens.Jwt;
+@using System.Net.Http.Headers
+@using System.Reflection.Metadata.Ecma335
 
-<div style="height: 100vh;  display: flex; justify-content: center; align-items: center">
-    <div style="border: 1px solid darkgray; display: flex; 
+<div style="height: 100vh;  display: flex; justify-content: center; align-items: center; flex-direction: row">
+    <div style="height: 100vh;  display: flex; justify-content: center; align-items: center; flex-direction: column">
+        <div style="border: 1px solid darkgray; display: flex; 
                flex-direction: column; justify-content: center; 
                align-items: center; 
                height: 500px; width: 500px; 
                gap: 10px;
                background-color: #fffde7; color: #170a0a
     ">
-        <h3>Login</h3>
+            <h3>Login</h3>
 
-        <button @onclick="LinkedinLogin">
-            <pre>Login with Linkedin</pre>
-        </button>
+            <button @onclick="LinkedinLogin">
+                <pre>Login with Linkedin</pre>
+            </button>
 
-        <pre>or</pre>
+            <pre>or</pre>
 
-        <input type="text" @bind="Email" placeholder="Email"/>
-        <input type="text" @bind="Password" placeholder="Password"/>
+            <input type="text" @bind="Email" placeholder="Email"/>
+            <input type="text" @bind="Password" placeholder="Password"/>
 
-        <button @onclick="NormalLogin">
-            <pre>Sign me up!</pre>
-        </button>
-        @if (user is not null)
-        {
-            <div>
-                <pre>@user.Id</pre>
-                <pre>@user.Email</pre>
-                <pre>@user.Password</pre>
+            <button @onclick="NormalLogin">
+                <pre>Sign me up!</pre>
+            </button>
+        </div>
+        <div style="border: 1px solid darkgray; display: flex; 
+               flex-direction: column; justify-content: start; 
+               align-items: start; 
+               height: 360px; width: 500px; 
+               padding: 1rem;
+               background-color: #fffde7; color: #170a0a;
+               flex-wrap: nowrap;
+    ">
+            <pre>Token:</pre>
+            <div style="
+            width: 100%;
+            padding: 1rem;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        ">
+                @loginToken
             </div>
-        }
+        </div>
+    </div>
+    <!--User data start--> 
+    <div style="height: 100vh;  display: flex; justify-content: center; align-items: center; flex-direction: column">
+        <div style="border: 1px solid darkgray; display: flex; 
+               flex-direction: column; justify-content: center; 
+               align-items: center; 
+               height: 500px; width: 500px; 
+               gap: 10px;
+               background-color: #fffde7; color: #170a0a
+    ">
+            <h3>User</h3>
+            @if (user is null)
+            {
+                <div style="
+            width: 100%;
+            padding: 1rem;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        ">
+                    @mesg
+                </div>
+            }
+            else
+            {
+                <div style="display: flex; font-size: 20px">
+                    <pre>Id: </pre>
+                    <pre style="background-color: #ffefd2">@user.Id</pre>
+                </div>
+                <div style="display: flex; font-size: 20px">
+                    <pre>Email: </pre>
+                    <pre style="background-color: #ffefd2">@user.Email</pre>
+                </div>
+            }
+
+        </div>
+        <div style="border: 1px solid darkgray; display: flex; 
+               flex-direction: column; justify-content: start; 
+               align-items: start; 
+               height: 360px; width: 500px; 
+               padding: 1rem;
+               background-color: #fffde7; color: #170a0a;
+               flex-wrap: nowrap;
+    ">
+            <pre>Endpoints:</pre>
+            <div style="
+            width: 100%;
+            padding: 1rem;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        ">
+                <button @onclick="GetTreasure">
+                    <pre>Call Authorized Endpoint</pre>
+                </button>
+                <pre style="background-color: #ffefd2">@treasure</pre>
+            </div>
+        </div>
     </div>
 </div>
-
-
 <style>
    button, input {
        border: 2px solid darkgray;
@@ -65,11 +135,24 @@
     static readonly Action<object> print = Console.WriteLine;
     string? Email { get; set; }
     string? Password { get; set; }
-    
+    string loginToken { get; set; } = "";
+    string mesg = "nothing here...";
+    string treasure = "nothing here...";
+
     User? user { get; set; }
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
+        print("init...");
+        var localToken = await JS.InvokeAsync<string>("localStorage.getItem", "localToken");
+        if (string.IsNullOrWhiteSpace(localToken))
+        {
+            mesg = "nothing in local storage...";
+            return;
+        }
+        var claims = new JwtSecurityToken(localToken).Payload;
+
+        user = new User(claims["id"].ToString() ?? "-1", claims["email"].ToString() ?? "example@email.com");
     }
     
     async Task LinkedinLogin()
@@ -82,17 +165,17 @@
         var tokenResponse = await response.Content.ReadAsStringAsync();
 
         // Store token in local storage
-        await JS.InvokeVoidAsync("localStorage.setItem", "linkedinAccessToken", tokenResponse);
+        await JS.InvokeVoidAsync("localStorage.setItem", "localToken", tokenResponse);
     }
     
     async Task<string> GetAuthorizationCode()
     {
         // Redirect user to LinkedIn authorization endpoint
-        // Link from linkedin docs
         // Grab secrets from configuration
-        string clientId = "";
-        string redirectUri = "";
-        
+        const string clientId = "";
+        const string redirectUri = "http://localhost:5215";
+
+        // Link from linkedin docs
         var authorizationUrl = $"https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id={clientId}&redirect_uri={redirectUri}&scope=r_liteprofile%20r_emailaddress";
         
         Nav.NavigateTo(authorizationUrl);
@@ -114,10 +197,10 @@
             var uri = new Uri(args.Location);
             var queryParams = HttpUtility.ParseQueryString(uri.Query);
             var code = queryParams["code"];
-            if (!string.IsNullOrEmpty(code)) tcs.SetResult(code);
+            if (!string.IsNullOrWhiteSpace(code)) tcs.SetResult(code);
         };
         
-        // return task to await
+        // return the task to await
         return await tcs.Task;
     }
 
@@ -127,6 +210,7 @@
         var request = new HttpRequestMessage(HttpMethod.Post, "http://localhost:5000/login");
         request.Content = new StringContent(JsonSerializer.Serialize(new { email = Email, password = Password }), 
             encoding: Encoding.UTF8, "application/json");
+        
         var result = await Http.SendAsync(request);
 
         if (!result.IsSuccessStatusCode)
@@ -136,9 +220,43 @@
         }
 
         var content = await result.Content.ReadAsStringAsync();
-        user = JsonSerializer.Deserialize<User>(content);
+        content = content.Trim('"');
+        
+        loginToken = content;
+        await JS.InvokeVoidAsync("localStorage.setItem", "localToken", content);
+        
+        var handler = new JwtSecurityTokenHandler();
+        var token = handler.ReadJwtToken(content);
+        
+        var claims = token.Payload;
+        
+        mesg = "";
+
+        user = new(claims["id"].ToString() ?? "-1", claims["email"].ToString() ?? "example@email.com");
+
     }
 
-    record User(string Id, string Email, string Password);
+    async Task GetTreasure()
+    {
+        var token = await JS.InvokeAsync<string>("localStorage.getItem", "localToken");
+        
+        // enable auth on all requests:
+        // Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var request = new HttpRequestMessage(HttpMethod.Get, "http://localhost:5000/treasure");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await Http.SendAsync(request);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            print("request failed");
+            return;
+        }
+
+        var content = await response.Content.ReadAsStringAsync();
+        treasure = content;
+    }
+    
+    record User(string Id, string Email);
 
 }
