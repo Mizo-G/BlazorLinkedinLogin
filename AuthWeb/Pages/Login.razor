@@ -11,6 +11,7 @@
 @using System.IdentityModel.Tokens.Jwt;
 @using System.Net.Http.Headers
 @using System.Reflection.Metadata.Ecma335
+@using System.Text.Json.Serialization
 
 <div style="height: 100vh;  display: flex; justify-content: center; align-items: center; flex-direction: row">
     <div style="height: 100vh;  display: flex; justify-content: center; align-items: center; flex-direction: column">
@@ -23,7 +24,7 @@
     ">
             <h3>Login</h3>
 
-            <button @onclick="LinkedinLogin">
+            <button @onclick="GetAuthorizationCode">
                 <pre>Login with Linkedin</pre>
             </button>
 
@@ -73,18 +74,21 @@
             word-wrap: break-word;
             overflow-wrap: break-word;
         ">
-                    @mesg
                 </div>
             }
             else
             {
                 <div style="display: flex; font-size: 20px">
-                    <pre>Id: </pre>
-                    <pre style="background-color: #ffefd2">@user.Id</pre>
+                    <pre>Name: </pre>
+                    <pre style="background-color: #ffefd2">@user.Name</pre>
                 </div>
                 <div style="display: flex; font-size: 20px">
                     <pre>Email: </pre>
                     <pre style="background-color: #ffefd2">@user.Email</pre>
+                </div>
+                <div style="display: flex; font-size: 20px">
+                    <pre>Picture: </pre>
+                    <img src="@user.Picture"/>
                 </div>
             }
 
@@ -101,13 +105,24 @@
             <div style="
             width: 100%;
             padding: 1rem;
+            display:flex;
+            flex-direction: column;
+            gap: 5px;
             word-wrap: break-word;
             overflow-wrap: break-word;
         ">
-                <button @onclick="GetTreasure">
-                    <pre>Call Authorized Endpoint</pre>
+                <button @onclick="GetLinkedinToken">
+                    <pre>Get Access Token</pre>
                 </button>
-                <pre style="background-color: #ffefd2">@treasure</pre>
+                <button @onclick="SaveCodeToLocalStorage">
+                    <pre>Save Code to Local Storage</pre>
+                </button>
+                <button @onclick="GetUserData">
+                    <pre>Get User Data From Linkedin</pre>
+                </button>
+                <button @onclick="GetUserDataFromIdToken">
+                    <pre>Get User Data</pre>
+                </button>
             </div>
         </div>
     </div>
@@ -152,56 +167,65 @@
         }
         var claims = new JwtSecurityToken(localToken).Payload;
 
-        user = new User(claims["id"].ToString() ?? "-1", claims["email"].ToString() ?? "example@email.com");
+        //user = new User(claims["id"].ToString() ?? "-1", claims["email"].ToString() ?? "example@email.com");
     }
-    
-    async Task LinkedinLogin()
+
+    async Task GetLinkedinToken()
     {
-        var authorizationCode = await GetAuthorizationCode();
-        
-        var response = await Http.PostAsJsonAsync("http://localhost:5000/linkedin/callback", authorizationCode);
-        if (!response.IsSuccessStatusCode) return;
-        
+        var code = await JS.InvokeAsync<string>("localStorage.getItem", "code");
+        var response = await Http.PostAsJsonAsync("http://localhost:5000/linkedin/callback", code);
+        print("response" + response.IsSuccessStatusCode);
+        if (!response.IsSuccessStatusCode) return; 
+
         var tokenResponse = await response.Content.ReadAsStringAsync();
 
-        // Store token in local storage
-        await JS.InvokeVoidAsync("localStorage.setItem", "localToken", tokenResponse);
+        await JS.InvokeVoidAsync("localStorage.setItem", "linkedinToken", tokenResponse);
     }
-    
-    async Task<string> GetAuthorizationCode()
+
+    async Task<bool> SaveCodeToLocalStorage()
+    {
+        var uri = new UriBuilder(Nav.Uri);
+        var queryParams = HttpUtility.ParseQueryString(uri.Query);
+        var code = queryParams["code"] ?? "";
+
+        if (string.IsNullOrWhiteSpace(code)) return false;
+        await JS.InvokeVoidAsync("localStorage.setItem", "code", code);
+        return true;
+    }
+
+    void GetAuthorizationCode()
     {
         // Redirect user to LinkedIn authorization endpoint
         // Grab secrets from configuration
-        const string clientId = "";
+        const string clientId = "77tgedfsh93yy3";
         const string redirectUri = "http://localhost:5215";
 
         // Link from linkedin docs
-        var authorizationUrl = $"https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id={clientId}&redirect_uri={redirectUri}&scope=r_liteprofile%20r_emailaddress";
-        
+        var authorizationUrl = $"https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id={clientId}&redirect_uri={redirectUri}&scope=openid%20email%20profile";
+
         Nav.NavigateTo(authorizationUrl);
 
         // TODO => Move the rest of this to the api, by setting the redirect uri to point to an api method 
-        
         // Handle the redirect and extract the authorization code from the URL
         // Here we wait for linkedin to redirect back
         // and subscribe to the location changed event to capture the data.
         // We could also set up the redirect uri to point to a different page
         // and grab the code from there.
-        var tcs = new TaskCompletionSource<string>();
-        
+        // var tcs = new TaskCompletionSource<string>();
+
         // Grab the code from the query params,
         // TODO => Use global auth state to keep track
         // of user and share state between components
-        Nav.LocationChanged += (sender, args) =>
-        {
-            var uri = new Uri(args.Location);
-            var queryParams = HttpUtility.ParseQueryString(uri.Query);
-            var code = queryParams["code"];
-            if (!string.IsNullOrWhiteSpace(code)) tcs.SetResult(code);
-        };
-        
+        // Nav.LocationChanged += (sender, args) =>
+        // {
+        //     var uri = new Uri(args.Location);
+        //     var queryParams = HttpUtility.ParseQueryString(uri.Query);
+        //     var code = queryParams["code"];
+        //     if (!string.IsNullOrWhiteSpace(code)) tcs.SetResult(code);
+        // };
+
         // return the task to await
-        return await tcs.Task;
+        //return await tcs.Task;
     }
 
     async Task NormalLogin()
@@ -210,7 +234,7 @@
         var request = new HttpRequestMessage(HttpMethod.Post, "http://localhost:5000/login");
         request.Content = new StringContent(JsonSerializer.Serialize(new { email = Email, password = Password }), 
             encoding: Encoding.UTF8, "application/json");
-        
+
         var result = await Http.SendAsync(request);
 
         if (!result.IsSuccessStatusCode)
@@ -221,32 +245,56 @@
 
         var content = await result.Content.ReadAsStringAsync();
         content = content.Trim('"');
-        
+
         loginToken = content;
         await JS.InvokeVoidAsync("localStorage.setItem", "localToken", content);
-        
+
         var handler = new JwtSecurityTokenHandler();
         var token = handler.ReadJwtToken(content);
-        
+
         var claims = token.Payload;
-        
+
         mesg = "";
 
-        user = new(claims["id"].ToString() ?? "-1", claims["email"].ToString() ?? "example@email.com");
+        //user = new(claims["id"].ToString() ?? "-1", claims["email"].ToString() ?? "example@email.com");
 
     }
 
-    async Task GetTreasure()
+    async Task GetUserDataFromIdToken()
     {
-        var token = await JS.InvokeAsync<string>("localStorage.getItem", "localToken");
-        
+        var stringToken = await JS.InvokeAsync<string>("localStorage.getItem", "linkedinToken");
+        var token = JsonSerializer.Deserialize<LinkedinToken>(stringToken);
+        if (token is null) return; 
+
+        var jwt = token.IdToken;
+        var handler = new JwtSecurityTokenHandler();
+        var handledToken = handler.ReadJwtToken(jwt);
+
+        var claims = handledToken.Payload;
+
+        user = new(claims["name"].ToString() ?? "no name...", claims["email"].ToString() ?? "no email...", claims["picture"].ToString() ?? "no picture...");
+
+
+
+    }
+
+    async Task GetUserData()
+    {
+        var stringToken = await JS.InvokeAsync<string>("localStorage.getItem", "linkedinToken");
+        var token = JsonSerializer.Deserialize<LinkedinToken>(stringToken);
+        if (token is null) return;
+        print(token.AccessToken ?? "");
+
         // enable auth on all requests:
-        // Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        var request = new HttpRequestMessage(HttpMethod.Get, "http://localhost:5000/treasure");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        // Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
+        //grab the url from linkedin docs
+
+        var request = new HttpRequestMessage(HttpMethod.Get,
+            "https://api.linkedin.com/v2/userinfo");
+
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
 
         var response = await Http.SendAsync(request);
-
         if (!response.IsSuccessStatusCode)
         {
             print("request failed");
@@ -254,9 +302,23 @@
         }
 
         var content = await response.Content.ReadAsStringAsync();
+        print(content);
         treasure = content;
     }
-    
-    record User(string Id, string Email);
 
+    record User(string Name, string Email, string Picture);
+    public class LinkedinToken
+    {
+        [JsonPropertyName("access_token")]
+        public string? AccessToken { get; set; }
+        [JsonPropertyName("expires_in")]
+        public int ExpiresIn { get; set; }
+        [JsonPropertyName("scope")]
+        public string? Scope { get; set; }
+        [JsonPropertyName("token_type")]
+        public string? TokenType { get; set; }
+        [JsonPropertyName("id_token")]
+        public string? IdToken { get; set; }
+
+    }
 }
