@@ -1,108 +1,117 @@
 ﻿@page "/"
+
 @using System.Net
 @using System.Security.Claims
+@using System.Reflection
 @using System.Text
 @using System.Text.Json
 @using System.Web
+@using System.IdentityModel.Tokens.Jwt;
+@using System.Net.Http.Headers
+@using System.Text.Json.Serialization
+
 @layout EmptyLayout
+
 @inject HttpClient Http
 @inject IJSRuntime JS
 @inject NavigationManager Nav
-@using System.IdentityModel.Tokens.Jwt;
-@using System.Net.Http.Headers
-@using System.Reflection.Metadata.Ecma335
-@using System.Text.Json.Serialization
 
 <div style="height: 100vh;  display: flex; justify-content: center; align-items: center; flex-direction: row">
-    <div style="height: 100vh;  display: flex; justify-content: center; align-items: center; flex-direction: column">
-        <div style="border: 1px solid darkgray; display: flex; 
-               flex-direction: column; justify-content: center; 
-               align-items: center; 
-               height: 500px; width: 500px; 
-               gap: 10px;
-               background-color: #fffde7; color: #170a0a
-    ">
-            <h3>Login</h3>
-
-            <button @onclick="GetAuthorizationCode">
-                <pre>Login with Linkedin</pre>
-            </button>
-
-            <pre>or</pre>
-
-            <input type="text" @bind="Email" placeholder="Email"/>
-            <input type="text" @bind="Password" placeholder="Password"/>
-
-            <button @onclick="NormalLogin">
-                <pre>Sign me up!</pre>
-            </button>
-        </div>
-        <div style="border: 1px solid darkgray; display: flex; 
-               flex-direction: column; justify-content: start; 
-               align-items: start; 
-               height: 360px; width: 500px; 
-               padding: 1rem;
-               background-color: #fffde7; color: #170a0a;
-               flex-wrap: nowrap;
-    ">
-            <pre>Token:</pre>
-            <div style="
+   <div style="height: 100vh;  display: flex; justify-content: center; align-items: center; flex-direction: column">
+      <div style="border: 1px solid darkgray; display: flex; 
+         flex-direction: column; justify-content: center; 
+         align-items: center; 
+         height: 500px; width: 500px; 
+         gap: 10px;
+         background-color: #fffde7; color: #170a0a
+         ">
+         <h3>Login</h3>
+         <button @onclick="GetAuthorizationCode">
+            <pre>Login with Linkedin</pre>
+         </button>
+         <pre>or</pre>
+         <input type="text" @bind="Email" placeholder="Email"/>
+         <input type="text" @bind="Password" placeholder="Password"/>
+         <button @onclick="NormalLogin">
+            <pre>Sign me up!</pre>
+         </button>
+      </div>
+      <div style="border: 1px solid darkgray; display: flex; 
+         flex-direction: column; justify-content: start; 
+         align-items: start; 
+         height: 360px; width: 500px; 
+         padding: 1rem;
+         background-color: #fffde7; color: #170a0a;
+         flex-wrap: nowrap;
+         ">
+         <pre>Endpoints:</pre>
+         <div style="
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
             width: 100%;
             padding: 1rem;
             word-wrap: break-word;
             overflow-wrap: break-word;
-        ">
-                @loginToken
-            </div>
-        </div>
-    </div>
-    <!--User data start--> 
-    <div style="height: 100vh;  display: flex; justify-content: center; align-items: center; flex-direction: column">
-        <div style="border: 1px solid darkgray; display: flex; 
-               flex-direction: column; justify-content: center; 
-               align-items: center; 
-               height: 500px; width: 500px; 
-               gap: 10px;
-               background-color: #fffde7; color: #170a0a
-    ">
-            <h3>User</h3>
-            @if (user is null)
-            {
-                <div style="
+            ">
+            <button @onclick="NavToProfile">
+                <pre>Go to profile page</pre>
+            </button>
+            <button @onclick="GetLinkedinRefreshToken">
+                <pre>Get Refresh Token From Linkedin</pre>
+            </button>
+            <button @onclick="GetApiRefreshToken">
+                <pre>Get Refresh Token From Api</pre>
+            </button>
+         </div>
+      </div>
+   </div>
+   <!--User data start--> 
+   <div style="height: 100vh;  display: flex; justify-content: center; align-items: center; flex-direction: column">
+      <div style="border: 1px solid darkgray; display: flex; 
+         flex-direction: column; justify-content: center; 
+         align-items: center; 
+         height: 500px; width: 500px; 
+         gap: 10px;
+         background-color: #fffde7; color: #170a0a
+         ">
+         <h3>User</h3>
+         @if (user is null)
+         {
+         <div style="
             width: 100%;
             padding: 1rem;
             word-wrap: break-word;
             overflow-wrap: break-word;
-        ">
-                </div>
-            }
-            else
-            {
-                <div style="display: flex; font-size: 20px">
-                    <pre>Name: </pre>
-                    <pre style="background-color: #ffefd2">@user.Name</pre>
-                </div>
-                <div style="display: flex; font-size: 20px">
-                    <pre>Email: </pre>
-                    <pre style="background-color: #ffefd2">@user.Email</pre>
-                </div>
-                <div style="display: flex; font-size: 20px">
-                    <pre>Picture: </pre>
-                    <img src="@user.Picture"/>
-                </div>
-            }
-
-        </div>
-        <div style="border: 1px solid darkgray; display: flex; 
-               flex-direction: column; justify-content: start; 
-               align-items: start; 
-               height: 360px; width: 500px; 
-               padding: 1rem;
-               background-color: #fffde7; color: #170a0a;
-               flex-wrap: nowrap;
-    ">
-            <pre>Endpoints:</pre>
-            <div style="
+            ">
+         </div>
+         }
+         else
+         {
+         <div style="display: flex; font-size: 20px">
+            <pre>Name: </pre>
+            <pre style="background-color: #ffefd2">@user.Name</pre>
+         </div>
+         <div style="display: flex; font-size: 20px">
+            <pre>Email: </pre>
+            <pre style="background-color: #ffefd2">@user.Email</pre>
+         </div>
+         <div style="display: flex; font-size: 20px">
+            <pre>Picture: </pre>
+            <img src="@user.Picture"/>
+         </div>
+         }
+      </div>
+      <div style="border: 1px solid darkgray; display: flex; 
+         flex-direction: column; justify-content: start; 
+         align-items: start; 
+         height: 360px; width: 500px; 
+         padding: 1rem;
+         background-color: #fffde7; color: #170a0a;
+         flex-wrap: nowrap;
+         ">
+         <pre>Endpoints:</pre>
+         <div style="
             width: 100%;
             padding: 1rem;
             display:flex;
@@ -110,50 +119,46 @@
             gap: 5px;
             word-wrap: break-word;
             overflow-wrap: break-word;
-        ">
-                <button @onclick="GetLinkedinToken">
-                    <pre>Get Access Token</pre>
-                </button>
-                <button @onclick="SaveCodeToLocalStorage">
-                    <pre>Save Code to Local Storage</pre>
-                </button>
-                <button @onclick="GetUserData">
-                    <pre>Get User Data From Linkedin</pre>
-                </button>
-                <button @onclick="GetUserDataFromIdToken">
-                    <pre>Get User Data</pre>
-                </button>
-            </div>
-        </div>
-    </div>
+            ">
+            <button @onclick="GetLinkedinToken">
+               <pre>Get Access Token</pre>
+            </button>
+            <button @onclick="SaveCodeToLocalStorage">
+               <pre>Save Code to Local Storage</pre>
+            </button>
+            <button @onclick="GetUserData">
+               <pre>Get User Data From Linkedin</pre>
+            </button>
+            <button @onclick="GetUserDataFromIdToken">
+               <pre>Get User Data</pre>
+            </button>
+         </div>
+      </div>
+   </div>
 </div>
 <style>
    button, input {
-       border: 2px solid darkgray;
-       background-color: #ffefd2;
-       width: 450px;
-       height: 60px;
+   border: 2px solid darkgray;
+   background-color: #ffefd2;
+   width: 450px;
+   height: 60px;
    }
    input {
-       padding: 0 10px; 
+   padding: 0 10px; 
    }
    button {
-       display: flex;
-       align-items: center;
-       justify-content: center;
-       padding-top: 13px;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   padding-top: 13px;
    }
 </style>
 
 @* ReSharper disable once InconsistentNaming *@
 @code {
-    static readonly Action<object> print = Console.WriteLine;
+    public static readonly Action<object> print = Console.WriteLine;
     string? Email { get; set; }
     string? Password { get; set; }
-    string loginToken { get; set; } = "";
-    string mesg = "nothing here...";
-    string treasure = "nothing here...";
-
     User? user { get; set; }
 
     protected override async Task OnInitializedAsync()
@@ -162,7 +167,7 @@
         var localToken = await JS.InvokeAsync<string>("localStorage.getItem", "localToken");
         if (string.IsNullOrWhiteSpace(localToken))
         {
-            mesg = "nothing in local storage...";
+            print("nothing in local storage...");
             return;
         }
         var claims = new JwtSecurityToken(localToken).Payload;
@@ -246,15 +251,12 @@
         var content = await result.Content.ReadAsStringAsync();
         content = content.Trim('"');
 
-        loginToken = content;
         await JS.InvokeVoidAsync("localStorage.setItem", "localToken", content);
 
         var handler = new JwtSecurityTokenHandler();
         var token = handler.ReadJwtToken(content);
 
         var claims = token.Payload;
-
-        mesg = "";
 
         //user = new(claims["id"].ToString() ?? "-1", claims["email"].ToString() ?? "example@email.com");
 
@@ -265,16 +267,14 @@
         var stringToken = await JS.InvokeAsync<string>("localStorage.getItem", "linkedinToken");
         var token = JsonSerializer.Deserialize<LinkedinToken>(stringToken);
         if (token is null) return; 
-
+    
         var jwt = token.IdToken;
         var handler = new JwtSecurityTokenHandler();
         var handledToken = handler.ReadJwtToken(jwt);
 
         var claims = handledToken.Payload;
 
-        user = new(claims["name"].ToString() ?? "no name...", claims["email"].ToString() ?? "no email...", claims["picture"].ToString() ?? "no picture...");
-
-
+        user = new(claims["id"].ToString() ?? "no id...", claims["name"].ToString() ?? "no name...", claims["email"].ToString() ?? "no email...", claims["picture"].ToString() ?? "no picture...");
 
     }
 
@@ -285,28 +285,52 @@
         if (token is null) return;
         print(token.AccessToken ?? "");
 
-        // enable auth on all requests:
-        // Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
-        //grab the url from linkedin docs
+        var response = await Http.PostAsJsonAsync("http://localhost:5000/userinfo", token.AccessToken);
+        print("response " + response.IsSuccessStatusCode);
+        if (!response.IsSuccessStatusCode) return; 
 
-        var request = new HttpRequestMessage(HttpMethod.Get,
-            "https://api.linkedin.com/v2/userinfo");
 
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
+        var jsonContent = await response.Content.ReadAsStringAsync();
+        User? content = JsonSerializer.Deserialize<User>(jsonContent);
+        if(content is null) { print("nothing here..."); return; }
 
-        var response = await Http.SendAsync(request);
-        if (!response.IsSuccessStatusCode)
-        {
-            print("request failed");
-            return;
-        }
-
-        var content = await response.Content.ReadAsStringAsync();
-        print(content);
-        treasure = content;
+        user = new("", content.Name ?? "no name...", content.Email ?? "no email...",
+                    content.Picture ?? "no picture...");
     }
 
-    record User(string Name, string Email, string Picture);
+    void GetApiRefreshToken() {
+      throw new NotImplementedException();
+    }
+
+     void GetLinkedinRefreshToken() {
+       throw new NotImplementedException(); 
+    }
+
+    void NavToProfile() {
+        Nav.NavigateTo("profile");
+    }
+
+    public class User{
+      [JsonPropertyName("id")]
+      public string Id { get; set; } = "";
+      [JsonPropertyName("name")]
+      public string Name { get; set; } = "";
+      [JsonPropertyName("email")]
+      public string Email { get; set; } = "";
+      [JsonPropertyName("picture")]
+      public string Picture { get; set; } = "";
+
+      public User() { }
+
+      public User(string id, string name, string email, string picture)
+      {
+         Id = id;
+         Name = name;
+         Email = email;
+         Picture = picture;
+      }
+   }
+
     public class LinkedinToken
     {
         [JsonPropertyName("access_token")]

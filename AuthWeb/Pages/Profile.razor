@@ -1,0 +1,76 @@
+@page "/profile"
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+@using static AuthWeb.Pages.Login
+@inject IJSRuntime js
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
+
+@attribute [Authorize]
+
+@layout EmptyLayout
+
+<div style="border: 1px solid darkgray; display: flex; 
+         flex-direction: column; justify-content: center; 
+         align-items: center; 
+         height: 500px; width: 500px; 
+         gap: 10px;
+         background-color: #fffde7; color: #170a0a
+         ">
+    @if(currentUser is not null)
+    {
+        <input type="text" @bind="currentUser.Name" placeholder="Email" />
+        <input type="text" @bind="currentUser.Email" placeholder="Password" />
+        <button @onclick="Logout">
+            <pre>Log me out!</pre>
+        </button>
+    }
+    else
+    {
+        <pre>loading...</pre>
+    }
+</div>
+
+
+@code {
+    User? currentUser;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetClaimsPrincipalData();
+    }
+    private async Task GetClaimsPrincipalData()
+    {
+        try 
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            if (user.Identity is not null && user.Identity.IsAuthenticated)
+            {
+                var id = user.FindFirst(c => c.Type == "id")?.Value;
+                var email = user.FindFirst(c => c.Type == "email")?.Value;
+                var name = user.FindFirst(c => c.Type == "name")?.Value;
+                print($"{name} is authenticated.");
+
+                currentUser = new(id ?? "no id...", name ?? "no name...", email ?? "no email...", "no picutre...");
+            }
+            else
+            {
+                print("not authorized");
+                Nav.NavigateTo(Nav.Uri);
+            }
+        }
+        catch(Exception e)
+        {
+            print(e.Message);
+        }
+    }
+
+    async Task Logout()
+    {
+        await js.InvokeVoidAsync("localStorage.removeItem", "localToken"); 
+        await AuthStateProvider.GetAuthenticationStateAsync(); 
+        Nav.NavigateTo(Nav.Uri);
+    }
+}

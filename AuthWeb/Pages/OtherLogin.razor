@@ -1,0 +1,55 @@
+@page "/other"
+@using System.Text.Json
+@using System.Text
+
+@inject HttpClient Http
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime Js
+
+@layout EmptyLayout
+
+<div style="border: 1px solid darkgray; display: flex; 
+         flex-direction: column; justify-content: center; 
+         align-items: center; 
+         height: 500px; width: 500px; 
+         gap: 10px;
+         background-color: #fffde7; color: #170a0a
+         ">
+    <h3>Login</h3>
+    <input type="text" @bind="user.Email" placeholder="Email" />
+    <input type="text" @bind="user.Password" placeholder="Password" />
+    <button @onclick="NormalLogin">
+        <pre>Sign me up!</pre>
+    </button>
+</div>
+
+@code {
+    static readonly Action<object> print = Console.WriteLine;
+    LoginUser user = new();
+    
+
+    async Task NormalLogin()
+    {
+        print("Normal login...");
+        var request = new HttpRequestMessage(HttpMethod.Post, "http://localhost:5000/login");
+        request.Content = new StringContent(JsonSerializer.Serialize(new { email = user.Email, password = user.Password }), 
+            encoding: Encoding.UTF8, "application/json");
+
+        var result = await Http.SendAsync(request);
+
+        if (!result.IsSuccessStatusCode)
+        {
+            print("result did not succeed");
+            return;
+        }
+
+        var content = await result.Content.ReadAsStringAsync();
+        content = content.Trim('"');
+
+        await Js.InvokeVoidAsync("localStorage.setItem", "localToken", content);
+
+        await AuthStateProvider.GetAuthenticationStateAsync();
+    }
+
+    public class LoginUser { public string? Email; public string? Password; }
+}
